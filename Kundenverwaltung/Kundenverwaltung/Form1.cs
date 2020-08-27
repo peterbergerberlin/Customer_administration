@@ -11,10 +11,12 @@ namespace Kundenverwaltung
         private static string connString = "Server=127.0.0.1; Port=3306; User Id=testuser_2; Password=test12345; Database=Kunden;";
         private static string sql_befehl;
         private static Kunde kunde;
-        private static string message = "Wollen Sie diesen Kunden wirklich löschen?";
+        private static int angezeigterKunde;
+        private static string message;
         private static string title = "Sicherheitsfrage";
         private static MessageBoxButtons buttons = MessageBoxButtons.YesNo;
-        
+        private static bool isNumeric;
+
 
         public Form1() {
             InitializeComponent();
@@ -25,7 +27,7 @@ namespace Kundenverwaltung
             Text = "Kundenverwaltung";
         }
 
-        public void putAllKundenFromDBInArrayList() {
+        private void putAllKundenFromDBInArrayList() {
             kundenListe = new List<Kunde>();
             try {
                 sql_befehl = "SELECT * FROM kundenliste";
@@ -54,7 +56,7 @@ namespace Kundenverwaltung
             }
         }
 
-        public void showKunde(Kunde kunde) {
+        private void showKunde(Kunde kunde) {
             rtb_kundennummer.Text = kunde.Kdnr.ToString();
             rtb_vorname.Text = kunde.Vorname;
             rtb_nachname.Text = kunde.Nachname;
@@ -63,6 +65,7 @@ namespace Kundenverwaltung
             rtb_ort.Text = kunde.Ort;
             rtb_email.Text = kunde.Email;
             lbl_count.Text = (kundenListe.IndexOf(kunde) + 1) + " von " + (kundenListe.Count());
+            angezeigterKunde = int.Parse(rtb_kundennummer.Text);
             lbl_infoText.Text = "";
         }
 
@@ -101,47 +104,52 @@ namespace Kundenverwaltung
             return true;
         }
 
-        private void addKunde() {   
-            kunde = new Kunde(int.Parse(rtb_kundennummer.Text), rtb_vorname.Text, rtb_nachname.Text, rtb_strasse.Text, rtb_plz.Text, rtb_ort.Text, rtb_email.Text);
-            if (isKundeValid(kunde)) {
-                if (int.Parse(rtb_kundennummer.Text) > 0) {
-                    if (!isEqualKundenNrInArrayList(int.Parse(rtb_kundennummer.Text))) {
-                        if (RegexUtilities.IsValidEmail(kunde.Email)) {
-                            try
-                            {
-                                sql_befehl = "INSERT INTO kundenliste VALUES (" + int.Parse(rtb_kundennummer.Text) + ",'" + rtb_vorname.Text + "','" + rtb_nachname.Text + "','" + rtb_strasse.Text + "','" + rtb_plz.Text + "','" + rtb_ort.Text + "','" + rtb_email.Text + "');";
-                                MySqlConnection conn = new MySqlConnection(connString);
-                                MySqlCommand cmd = new MySqlCommand(sql_befehl, conn);
-                                conn.Open();
-                                MySqlDataReader reader = cmd.ExecuteReader();
-                                conn.Close();
-                                putAllKundenFromDBInArrayList();
-                                showKunde(getKundeFromArrayList(int.Parse(rtb_kundennummer.Text)));
-                            }
-                            catch (Exception e)
-                            {
-                                Console.WriteLine("Upps" + " " + e);
-                            }
-                        } else { lbl_infoText.Text = "Die angegebene E-Mail Adresse ist ungültig."; }
-                    } else { lbl_infoText.Text = "Diese Kundennummer ist schon vergeben."; }
-                } else { lbl_infoText.Text = "Die Kundennummer muss größer als Null sein."; }
-            } else { lbl_infoText.Text = "Bitte füllen Sie alle Felder aus."; }
+        private void addKunde() {
+            string kdnr = rtb_kundennummer.Text;
+            isNumeric = int.TryParse(kdnr, out _);
+            if (isNumeric){
+                if (String.IsNullOrWhiteSpace(kdnr)) { kdnr = "0"; }
+                if (int.Parse(kdnr) > 0){
+                    kunde = new Kunde(int.Parse(rtb_kundennummer.Text), rtb_vorname.Text, rtb_nachname.Text, rtb_strasse.Text, rtb_plz.Text, rtb_ort.Text, rtb_email.Text);
+                    if (isKundeValid(kunde)){
+                        if (!isEqualKundenNrInArrayList(int.Parse(kdnr))){
+                            if (RegexUtilities.IsValidEmail(kunde.Email)){
+                                try{
+                                    sql_befehl = "INSERT INTO kundenliste VALUES (" + int.Parse(rtb_kundennummer.Text) + ",'" + rtb_vorname.Text + "','" + rtb_nachname.Text + "','" + rtb_strasse.Text + "','" + rtb_plz.Text + "','" + rtb_ort.Text + "','" + rtb_email.Text + "');";
+                                    MySqlConnection conn = new MySqlConnection(connString);
+                                    MySqlCommand cmd = new MySqlCommand(sql_befehl, conn);
+                                    conn.Open();
+                                    MySqlDataReader reader = cmd.ExecuteReader();
+                                    conn.Close();
+                                    putAllKundenFromDBInArrayList();
+                                    showKunde(getKundeFromArrayList(int.Parse(rtb_kundennummer.Text)));
+                                }
+                                catch (Exception e)
+                                {
+                                    Console.WriteLine("Upps" + " " + e);
+                                }
+                            }else { lbl_infoText.Text = "Die angegebene E-Mail Adresse ist ungültig."; }
+                        }else { lbl_infoText.Text = "Diese Kundennummer ist schon vergeben."; }
+                    }else { lbl_infoText.Text = "Bitte füllen Sie alle Felder aus."; }
+                }else { lbl_infoText.Text = "Die Kundennummer muss größer als Null sein."; }
+            }else { lbl_infoText.Text = "Die Kundennummer muss eine Zahl sein."; }
         }
 
         private void deleteKunde()
         {
+            message = "Wollen Sie den Kunden mit der Kundennummer " + angezeigterKunde + " wirklich löschen?";
             DialogResult result = MessageBox.Show(message, title, buttons);
             if (result == DialogResult.Yes) {
                 try
                 {
-                    sql_befehl = "DELETE FROM kundenliste WHERE kdnr =" + rtb_kundennummer.Text;
+                    sql_befehl = "DELETE FROM kundenliste WHERE kdnr =" + angezeigterKunde;
                     MySqlConnection conn = new MySqlConnection(connString);
                     MySqlCommand cmd = new MySqlCommand(sql_befehl, conn);
                     conn.Open();
                     MySqlDataReader reader = cmd.ExecuteReader();
                     conn.Close();
-                    int tempIndex = kundenListe.IndexOf(getKundeFromArrayList(int.Parse(rtb_kundennummer.Text)));
-                    kundenListe.Remove(getKundeFromArrayList(int.Parse(rtb_kundennummer.Text)));
+                    int tempIndex = kundenListe.IndexOf(getKundeFromArrayList(angezeigterKunde));
+                    kundenListe.Remove(getKundeFromArrayList(angezeigterKunde));
                     if (tempIndex == 0) { showKunde(kundenListe[tempIndex]); }
                     else { showKunde(kundenListe[tempIndex - 1]); }
                 }
@@ -153,13 +161,13 @@ namespace Kundenverwaltung
         }
 
         private void buttonDisabler() {
-            if (kundenListe.IndexOf(getKundeFromArrayList(int.Parse(rtb_kundennummer.Text))) == 0) {
+            if (kundenListe.IndexOf(getKundeFromArrayList(angezeigterKunde)) == 0) {
                 btn_first_kunde.Enabled = false;
                 btn_prev_kunde.Enabled = false;
                 btn_last_kunde.Enabled = true;
                 btn_next_kunde.Enabled = true;
             }
-            else if (kundenListe.IndexOf(getKundeFromArrayList(int.Parse(rtb_kundennummer.Text))) == (kundenListe.Count - 1)) {
+            else if (kundenListe.IndexOf(getKundeFromArrayList(angezeigterKunde)) == (kundenListe.Count - 1)) {
                 btn_last_kunde.Enabled = false;
                 btn_next_kunde.Enabled = false;
                 btn_first_kunde.Enabled = true;
@@ -180,7 +188,8 @@ namespace Kundenverwaltung
 
         private void btn_new_kunde_Click(object sender, EventArgs e) {
             addKunde();
-            buttonDisabler();
+            if (!String.IsNullOrWhiteSpace(rtb_kundennummer.Text)) {buttonDisabler();}
+            
         }
 
         private void btn_delete_kunde_Click(object sender, EventArgs e) {
@@ -189,12 +198,12 @@ namespace Kundenverwaltung
         }
 
         private void btn_prev_kunde_Click(object sender, EventArgs e) {
-            showKunde(kundenListe[kundenListe.IndexOf(getKundeFromArrayList(int.Parse(rtb_kundennummer.Text))) - 1]);
+            showKunde(kundenListe[kundenListe.IndexOf(getKundeFromArrayList(angezeigterKunde)) - 1]);
             buttonDisabler();
         }
 
         private void btn_next_kunde_Click(object sender, EventArgs e) {
-            showKunde(kundenListe[kundenListe.IndexOf(getKundeFromArrayList(int.Parse(rtb_kundennummer.Text))) + 1]);
+            showKunde(kundenListe[kundenListe.IndexOf(getKundeFromArrayList(angezeigterKunde)) + 1]);
             buttonDisabler();
         }
 
